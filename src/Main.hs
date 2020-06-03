@@ -250,24 +250,23 @@ initItems :: ReaderT FilePath IO ()
 initItems = writeTodoList $ TodoList []
 
 viewItems :: ReaderT FilePath IO ()
-viewItems = ReaderT $ \dataPath -> readTodoList dataPath >>= \(TodoList items) ->
-  forM_ (zip [0..] items) (\(idx, item) -> showItem idx item)
+viewItems = readTodoList >>= \(TodoList items) ->
+  liftIO $ forM_ (zip [0..] items) (\(idx, item) -> showItem idx item)
 
 addItem :: Item -> ReaderT FilePath IO ()
-addItem item = (ReaderT readTodoList >>= \(TodoList items) ->
+addItem item = (readTodoList >>= \(TodoList items) ->
   writeTodoList (TodoList $ item : items)) >>
     (liftIO $ putStrLn "Add successfully")
     -- (ReaderT $ \_ -> putStrLn "Add successfully")
 
 viewItem :: ItemIndex -> ReaderT FilePath IO ()
-viewItem idx = ReaderT $ \dataPath -> 
-  readTodoList dataPath >>= \(TodoList items) ->
+viewItem idx = readTodoList >>= \(TodoList items) ->
   case items !! idx of
-    Nothing -> putStrLn $ "Item at " ++ show idx ++ " not found"
-    Just item -> showItem idx item
+    Nothing -> liftIO $ putStrLn $ "Item at " ++ show idx ++ " not found"
+    Just item -> liftIO $ showItem idx item
 
 removeItem :: ItemIndex -> ReaderT FilePath IO ()
-removeItem idx = ReaderT readTodoList >>= \(TodoList items) ->
+removeItem idx = readTodoList >>= \(TodoList items) ->
   case items `removeAt` idx of
     Nothing -> liftIO . putStrLn $ "Item at " ++ show idx ++ " not found"
     Just items -> writeTodoList (TodoList items) >>
@@ -275,7 +274,7 @@ removeItem idx = ReaderT readTodoList >>= \(TodoList items) ->
 
 updateItem :: ItemIndex -> ItemUpdate -> ReaderT FilePath IO ()
 updateItem idx (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) = 
-  ReaderT readTodoList >>= \(TodoList items) ->
+  readTodoList >>= \(TodoList items) ->
     let update (Item title description priority dueBy) = Item
             (updateField mbTitle title)
             (updateField mbDescription description)
@@ -287,16 +286,15 @@ updateItem idx (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) =
     in case mbItems of
         Nothing -> liftIO . putStrLn $ "Invalid item index"
         Just items' -> 
-          let toDoList = TodoList items'
-          in writeTodoList toDoList >>
-             (liftIO . putStrLn) "Update successfully"
+          (writeTodoList $ TodoList items') >>
+           (liftIO . putStrLn) "Update successfully"
 
 writeTodoList :: TodoList -> ReaderT FilePath IO ()
 writeTodoList todoList = ReaderT $ \dataPath -> 
   BS.writeFile dataPath $ Yaml.encode todoList
 
-readTodoList :: FilePath -> IO TodoList
-readTodoList dataPath = (catchJust
+readTodoList :: ReaderT FilePath IO TodoList
+readTodoList = ReaderT $ \dataPath -> (catchJust
   (\e -> if isDoesNotExistError e then Just () else Nothing)
   (BS.readFile dataPath >>= return . (either (const Nothing) Just) . Yaml.decodeEither')
   (const $ return $ Just $ TodoList []))
