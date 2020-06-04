@@ -188,26 +188,26 @@ main = (execParser $ info optionsParser $ progDesc "Todo list")
   >>= \homeDir -> 
     let expendedDataPath = replace "~" homeDir dataPath
         dueBy = LocalTime (ModifiedJulianDay 0) (TimeOfDay 0 0 0)
-    in run expendedDataPath command
+    in runReaderT (run command) expendedDataPath 
 
-run :: FilePath -> Command -> IO ()
-run dataPath Info = runReaderT showInfo $ dataPath
-run dataPath Init = runReaderT initItems $ dataPath
-run dataPath List = runReaderT viewItems $ dataPath
-run dataPath (Add item) = runReaderT (addItem item) dataPath
-run dataPath (View idx) = runReaderT (viewItem idx) dataPath
-run dataPath (Update idx itemUpdate) = runReaderT (updateItem idx itemUpdate) dataPath 
-run dataPath (Remove idx) = runReaderT (removeItem idx) dataPath
+run :: Command -> ReaderT FilePath IO ()
+run Info = showInfo
+run Init = initItems
+run List = viewItems
+run (Add item) = addItem item
+run (View idx) = viewItem idx
+run (Update idx itemUpdate) = updateItem idx itemUpdate
+run (Remove idx) = removeItem idx
 
 showItem :: ItemIndex -> Item -> IO ()
 showItem idx (Item title mbDescription mbPriority mbDueBy) = do
-    putStrLn $ "[" ++ show idx ++ "]: " ++ title
-    putStr "  Description: "
-    putStrLn $ showField id mbDescription
-    putStr "  Priority: "
-    putStrLn $ showField show mbPriority
-    putStr "  Due by: "
-    putStrLn $ showField (formatTime defaultTimeLocale "%Y/%m/%d %H:%M:%S") mbDueBy
+  putStrLn $ "[" ++ show idx ++ "]: " ++ title
+  putStr "  Description: "
+  putStrLn $ showField id mbDescription
+  putStr "  Priority: "
+  putStrLn $ showField show mbPriority
+  putStr "  Due by: "
+  putStrLn $ showField (formatTime defaultTimeLocale "%Y/%m/%d %H:%M:%S") mbDueBy
 
 showField :: (a -> String) -> Maybe a -> String
 showField f (Just x) = f x
